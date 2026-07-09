@@ -1,0 +1,41 @@
+<pluginMetaData path="totpmfa">
+	<name>TOTP MFA</name>
+	<author>Chris Gibson</author>
+	<pluginVersion>0.1.0</pluginVersion>
+	<mirthVersion>4.6.0</mirthVersion>
+	<url>https://openintegrationengine.org</url>
+	<description>TOTP (RFC 6238) multi-factor authentication for administrator login. Challenges enrolled users with a time-based one-time code after their password; per-user secrets are stored encrypted in a dedicated USER_TOTP database table (MyBatis), with one-time-use (replay) protection.</description>
+	<serverClasses>
+		<string>org.openintegrationengine.plugins.totp.TotpAuthenticationPlugin</string>
+	</serverClasses>
+	<library type="SHARED" path="totpmfa-shared.jar" />
+	<!-- Per-vendor MyBatis mapper for the USER_TOTP table (namespace "UserTotp").
+	     The engine merges the mapper for the running database into its shared
+	     MyBatis config; the file path is relative to this plugin's directory. -->
+	<sqlMapConfigs>
+		<entry>
+			<string>derby</string>
+			<string>mapper/derby-usertotp.xml</string>
+		</entry>
+		<entry>
+			<string>mysql</string>
+			<string>mapper/mysql-usertotp.xml</string>
+		</entry>
+		<entry>
+			<string>postgres</string>
+			<string>mapper/postgres-usertotp.xml</string>
+		</entry>
+		<entry>
+			<string>sqlserver</string>
+			<string>mapper/sqlserver-usertotp.xml</string>
+		</entry>
+		<entry>
+			<string>oracle</string>
+			<string>mapper/oracle-usertotp.xml</string>
+		</entry>
+		<entry>
+			<string>all</string>
+			<string>mapper/derby-usertotp.xml</string>
+		</entry>
+	</sqlMapConfigs>
+</pluginMetaData>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.openintegrationengine.plugins</groupId>
+    <artifactId>totpmfa</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <name>OIE TOTP MFA</name>
+    <description>TOTP (RFC 6238) multi-factor authentication plugin for the Open Integration Engine administrator login.</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <oie.home>${env.OIE_HOME}</oie.home>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.mirth.connect</groupId>
+            <artifactId>mirth-server</artifactId>
+            <version>4.6.0</version>
+            <scope>system</scope>
+            <systemPath>${oie.home}/server-lib/mirth-server.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.mirth.connect</groupId>
+            <artifactId>mirth-client-core</artifactId>
+            <version>4.6.0</version>
+            <scope>system</scope>
+            <systemPath>${oie.home}/server-lib/mirth-client-core.jar</systemPath>
+        </dependency>
+        <!-- Encryptor is referenced through ConfigurationController.getEncryptor(). -->
+        <dependency>
+            <groupId>com.mirth.commons</groupId>
+            <artifactId>mirth-crypto</artifactId>
+            <version>4.6.0</version>
+            <scope>system</scope>
+            <systemPath>${oie.home}/server-lib/mirth-crypto.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.20.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- MyBatis: SqlSession / SqlSessionManager, provided by the engine at runtime. -->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>3.1.1</version>
+            <scope>system</scope>
+            <systemPath>${oie.home}/server-lib/mybatis-3.1.1.jar</systemPath>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>totpmfa-shared</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/main/assembly/extension-zip.xml</descriptor>
+                    </descriptors>
+                    <finalName>totpmfa-${project.version}</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>extension-zip</id>
+                        <phase>package</phase>
+                        <goals><goal>single</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

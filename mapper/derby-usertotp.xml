@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC '-//mybatis.org//DTD Mapper 3.0//EN' 'http://mybatis.org/dtd/mybatis-3-mapper.dtd'>
+
+<!-- OIE TOTP MFA — derby mapper for the USER_TOTP table (namespace UserTotp). -->
+<mapper namespace="UserTotp">
+
+    <update id="createTable">
+        CREATE TABLE USER_TOTP (
+            USERNAME VARCHAR(255) NOT NULL,
+            SECRET VARCHAR(512) NOT NULL,
+            ENROLLED_AT TIMESTAMP,
+            LAST_USED_STEP BIGINT DEFAULT 0,
+            CONSTRAINT PK_USER_TOTP PRIMARY KEY (USERNAME)
+        )
+    </update>
+
+    <select id="find" parameterType="string" resultType="hashmap">
+        SELECT SECRET, LAST_USED_STEP FROM USER_TOTP WHERE USERNAME = #{username}
+    </select>
+
+    <insert id="insert" parameterType="map">
+        INSERT INTO USER_TOTP (USERNAME, SECRET, ENROLLED_AT, LAST_USED_STEP)
+        VALUES (#{username}, #{secret}, #{enrolledAt}, #{lastUsedStep})
+    </insert>
+
+    <update id="updateSecret" parameterType="map">
+        UPDATE USER_TOTP
+        SET SECRET = #{secret}, ENROLLED_AT = #{enrolledAt}, LAST_USED_STEP = #{lastUsedStep}
+        WHERE USERNAME = #{username}
+    </update>
+
+    <update id="updateLastStep" parameterType="map">
+        UPDATE USER_TOTP SET LAST_USED_STEP = #{lastUsedStep} WHERE USERNAME = #{username}
+    </update>
+
+    <delete id="delete" parameterType="string">
+        DELETE FROM USER_TOTP WHERE USERNAME = #{username}
+    </delete>
+
+</mapper>

@@ -1,0 +1,30 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.1.1"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.1 http://maven.apache.org/xsd/assembly-2.1.1.xsd">
+    <id>extension</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <files>
+        <file>
+            <source>plugin.xml</source>
+            <outputDirectory>totpmfa</outputDirectory>
+        </file>
+        <file>
+            <source>${project.build.directory}/totpmfa-shared.jar</source>
+            <outputDirectory>totpmfa</outputDirectory>
+        </file>
+    </files>
+    <fileSets>
+        <!-- Per-vendor MyBatis mapper files, referenced by plugin.xml sqlMapConfigs
+             at totpmfa/mapper/<db>-usertotp.xml. -->
+        <fileSet>
+            <directory>mapper</directory>
+            <outputDirectory>totpmfa/mapper</outputDirectory>
+            <includes>
+                <include>*.xml</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+</assembly>
