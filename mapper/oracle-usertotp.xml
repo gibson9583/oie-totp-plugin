@@ -14,6 +14,10 @@
         )
     </update>
 
+    <select id="listEnrolled" resultType="string">
+        SELECT USERNAME FROM USER_TOTP ORDER BY USERNAME
+    </select>
+
     <select id="find" parameterType="string" resultType="hashmap">
         SELECT SECRET, LAST_USED_STEP FROM USER_TOTP WHERE USERNAME = #{username}
     </select>

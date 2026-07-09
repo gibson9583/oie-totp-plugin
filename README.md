@@ -113,11 +113,14 @@ standard TOTP/OTP plugin like this one does not.
 - **QR enrollment** — the OIE web administrator's built-in OTP UI renders a QR from
   the `otpauth://` URI (server-only plugin; nothing to bundle).
 
+- **Admin device-reset** — a **Two-Factor Authentication** tab in Settings lists
+  enrolled users and resets one (clears their secret so their next login
+  re-enrolls) — the lost/changed-device path. Backed by
+  `GET/POST /extensions/totpmfa/{enrolled,reset}`, gated by the engine's
+  `USERS_MANAGE` permission.
+
 ## Still out of scope (deliberately)
 
-- **Admin device-reset** — the DAO has `remove(username)`, but there's no UI/endpoint
-  yet to clear a user's enrollment when they lose a device (an admin can delete the
-  row, or the user's row can be removed programmatically).
 - **Uninstall DROP** — uninstalling the plugin leaves the `USER_TOTP` table in place;
   a `plugin.xml` `<sqlScript>` uninstall section could drop it.
 

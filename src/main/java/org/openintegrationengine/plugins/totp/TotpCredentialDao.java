@@ -6,7 +6,9 @@
 
 package org.openintegrationengine.plugins.totp;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.session.SqlSession;
@@ -65,6 +67,20 @@ public class TotpCredentialDao {
             // Table already exists (the common case), or a real DDL problem — either
             // way subsequent reads/writes will surface a genuine failure loudly.
             logger.debug("TOTP MFA: USER_TOTP table already present (or create skipped): " + e.getMessage());
+        } finally {
+            session.close();
+        }
+    }
+
+    /** All enrolled usernames (for the admin panel). */
+    public List<String> listEnrolled() {
+        SqlSession session = openSession();
+        try {
+            List<String> names = session.selectList(NS + "listEnrolled");
+            return names != null ? names : Collections.emptyList();
+        } catch (Exception e) {
+            logger.warn("TOTP MFA: could not list enrolled users: " + e.getMessage());
+            return Collections.emptyList();
         } finally {
             session.close();
         }

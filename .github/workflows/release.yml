@@ -74,6 +74,7 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           mvn -B -ntp versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
           sed -i "s|<pluginVersion>[^<]*</pluginVersion>|<pluginVersion>${VERSION}</pluginVersion>|" plugin.xml
+          sed -i "s|"version":[[:space:]]*"[^"]*"|"version": "${VERSION}"|" webadmin/plugin.json
 
       - name: Build extension
         run: mvn -B -ntp -DskipTests package

@@ -11,9 +11,11 @@ Integration Engine administrator login.
   table (MyBatis), encrypted with the engine's configured encryptor. Never stored in
   the clear.
 - **Replay protection** — a one-time code can't be reused.
-- **Server-only** — the web administrator's built-in OTP UI renders the
-  enrollment/verification (QR + code), so there's nothing extra to install on the
-  web side.
+- **Login is server-only** — the web administrator's built-in OTP UI renders
+  enrollment/verification (QR + code), so nothing extra installs for the login flow.
+- **Admin reset** — a *Two-Factor Authentication* tab in Settings lists enrolled
+  users and resets one (lost/changed device) — pushing them back to enrollment on
+  their next login.
 
 ## ⚠️ Before you install
 

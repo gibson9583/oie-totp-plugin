@@ -15,6 +15,14 @@
             <source>${project.build.directory}/totpmfa-shared.jar</source>
             <outputDirectory>totpmfa</outputDirectory>
         </file>
+        <file>
+            <source>webadmin/plugin.json</source>
+            <outputDirectory>totpmfa/webadmin</outputDirectory>
+        </file>
+        <file>
+            <source>webadmin/web/plugin.js</source>
+            <outputDirectory>totpmfa/webadmin/web</outputDirectory>
+        </file>
     </files>
     <fileSets>
         <!-- Per-vendor MyBatis mapper files, referenced by plugin.xml sqlMapConfigs
