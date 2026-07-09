@@ -1,7 +1,7 @@
 <pluginMetaData path="totpmfa">
 	<name>TOTP MFA</name>
 	<author>Chris Gibson</author>
-	<pluginVersion>0.2.0</pluginVersion>
+	<pluginVersion>0.3.0</pluginVersion>
 	<mirthVersion>4.6.0</mirthVersion>
 	<url>https://openintegrationengine.org</url>
 	<description>TOTP (RFC 6238) multi-factor authentication for administrator login. Challenges enrolled users with a time-based one-time code after their password; per-user secrets are stored encrypted in a dedicated USER_TOTP database table (MyBatis), with one-time-use (replay) protection.</description>

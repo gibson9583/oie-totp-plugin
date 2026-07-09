@@ -2,7 +2,7 @@
 # a GitHub Release with the zip, then opens a community-catalog PR so the Community
 # Store offers it.
 #
-#   git tag v0.2.0 && git push origin v0.2.0
+#   git tag v0.3.0 && git push origin v0.3.0
 #
 # The tag drives the version stamped into the pom (zip name), plugin.xml
 # (pluginVersion — what the engine reports as "installed"); oie.json is verified to

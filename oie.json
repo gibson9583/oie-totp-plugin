@@ -4,7 +4,7 @@
     "name": "TOTP MFA",
     "description": "TOTP (RFC 6238) multi-factor authentication for administrator login. Users self-enroll on first login (QR / key + code); every login after asks for the current code. Per-user secrets are stored encrypted in a dedicated USER_TOTP database table (MyBatis) with one-time-use (replay) protection. Includes a Settings tab to reset a user for lost-device recovery.",
     "type": "plugin",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "minEngineVersion": "4.6.0",
     "maxEngineVersion": null,
     "filename": "totpmfa-{version}.zip",

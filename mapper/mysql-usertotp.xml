@@ -1,44 +1,46 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC '-//mybatis.org//DTD Mapper 3.0//EN' 'http://mybatis.org/dtd/mybatis-3-mapper.dtd'>
 
-<!-- OIE TOTP MFA — mysql mapper for the USER_TOTP table (namespace UserTotp). -->
+<!-- OIE TOTP MFA — mysql mapper for the USER_TOTP table (namespace UserTotp).
+     Keyed by the user's numeric id (the PERSON table PK), which is stable across
+     username renames and reused after a delete/re-add cycle only as a NEW id. -->
 <mapper namespace="UserTotp">
 
     <update id="createTable">
         CREATE TABLE USER_TOTP (
-            USERNAME VARCHAR(255) NOT NULL,
+            USER_ID INT NOT NULL,
             SECRET VARCHAR(512) NOT NULL,
             ENROLLED_AT TIMESTAMP NULL,
             LAST_USED_STEP BIGINT DEFAULT 0,
-            CONSTRAINT PK_USER_TOTP PRIMARY KEY (USERNAME)
+            CONSTRAINT PK_USER_TOTP PRIMARY KEY (USER_ID)
         )
     </update>
 
-    <select id="listEnrolled" resultType="string">
-        SELECT USERNAME FROM USER_TOTP ORDER BY USERNAME
+    <select id="listEnrolledIds" resultType="java.lang.Integer">
+        SELECT USER_ID FROM USER_TOTP ORDER BY USER_ID
     </select>
 
-    <select id="find" parameterType="string" resultType="hashmap">
-        SELECT SECRET, LAST_USED_STEP FROM USER_TOTP WHERE USERNAME = #{username}
+    <select id="find" parameterType="int" resultType="hashmap">
+        SELECT SECRET, LAST_USED_STEP FROM USER_TOTP WHERE USER_ID = #{userId}
     </select>
 
     <insert id="insert" parameterType="map">
-        INSERT INTO USER_TOTP (USERNAME, SECRET, ENROLLED_AT, LAST_USED_STEP)
-        VALUES (#{username}, #{secret}, #{enrolledAt}, #{lastUsedStep})
+        INSERT INTO USER_TOTP (USER_ID, SECRET, ENROLLED_AT, LAST_USED_STEP)
+        VALUES (#{userId}, #{secret}, #{enrolledAt}, #{lastUsedStep})
     </insert>
 
     <update id="updateSecret" parameterType="map">
         UPDATE USER_TOTP
         SET SECRET = #{secret}, ENROLLED_AT = #{enrolledAt}, LAST_USED_STEP = #{lastUsedStep}
-        WHERE USERNAME = #{username}
+        WHERE USER_ID = #{userId}
     </update>
 
     <update id="updateLastStep" parameterType="map">
-        UPDATE USER_TOTP SET LAST_USED_STEP = #{lastUsedStep} WHERE USERNAME = #{username}
+        UPDATE USER_TOTP SET LAST_USED_STEP = #{lastUsedStep} WHERE USER_ID = #{userId}
     </update>
 
-    <delete id="delete" parameterType="string">
-        DELETE FROM USER_TOTP WHERE USERNAME = #{username}
+    <delete id="delete" parameterType="int">
+        DELETE FROM USER_TOTP WHERE USER_ID = #{userId}
     </delete>
 
 </mapper>

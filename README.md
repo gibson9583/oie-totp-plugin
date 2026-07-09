@@ -26,8 +26,8 @@ Two stateless server legs (`MultiFactorAuthenticationPlugin`):
   client-side authenticator (`clientPluginClass`) with a JSON message: either
   `{mode:"verify", challenge}` or, for a new user, `{mode:"enroll", challenge,
   secret, otpauthUri}`. `challenge` is a **signed token** ([`Challenge`](src/main/java/org/openintegrationengine/plugins/totp/Challenge.java))
-  carrying the username, the mode, and (for enrollment) the pending secret — so
-  leg 2 needs no server-side session.
+  carrying the user's numeric id, the mode, and (for enrollment) the pending
+  secret — so leg 2 needs no server-side session.
 - **Leg 2** `authenticate(loginData)` runs with only the `X-Mirth-Login-Data`
   header the client sends (`base64(JSON{challenge, code})`). It verifies the
   challenge signature to recover a trusted payload, validates the TOTP code, and
@@ -46,10 +46,15 @@ the engine's own persistence, not the plugin properties blob:
 
 | Column | Purpose |
 |---|---|
-| `USERNAME` | primary key |
+| `USER_ID` | primary key — the user's **numeric id** (the engine `PERSON` table PK) |
 | `SECRET` | the base32 secret, **encrypted** with the engine's configured `Encryptor` |
 | `ENROLLED_AT` | enrollment timestamp |
 | `LAST_USED_STEP` | the last accepted TOTP time-step — **replay protection** (a code can't be reused) |
+
+Keying by numeric id (not username) means a **rename keeps** the enrollment, and a
+**delete/re-add** of the same username starts fresh (the new account gets a new id).
+The admin Settings tab cross-references enrollments against the current user set, so
+a removed user's row never shows and is pruned.
 
 The mapped statements are per-vendor mapper files
 ([`mapper/<db>-usertotp.xml`](mapper/), namespace `UserTotp`) declared in
@@ -79,7 +84,7 @@ administrator must be able to render it:
 ## Build & install
 
 ```bash
-OIE_HOME=/path/to/oie mvn package        # -> target/totpmfa-0.1.0.zip
+OIE_HOME=/path/to/oie mvn package        # -> target/totpmfa-0.3.0.zip
 ```
 
 Install the zip from the web administrator's **Extensions** page (or the Swing

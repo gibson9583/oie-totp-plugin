@@ -16,6 +16,7 @@ import org.apache.logging.log4j.Logger;
 import com.mirth.connect.model.ExtendedLoginStatus;
 import com.mirth.connect.model.ExtensionPermission;
 import com.mirth.connect.model.LoginStatus;
+import com.mirth.connect.model.User;
 import com.mirth.connect.model.LoginStatus.Status;
 import com.mirth.connect.plugins.MultiFactorAuthenticationPlugin;
 import com.mirth.connect.server.controllers.ControllerFactory;
@@ -135,16 +136,24 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
             return primaryStatus;
         }
 
+        // Enrollments are keyed by the user's numeric id, so resolve it now (primary
+        // auth already succeeded, so the user exists). If we can't, don't block login.
+        Integer userId = resolveUserId(username);
+        if (userId == null) {
+            logger.warn("TOTP MFA: could not resolve a user id for '" + username + "'; passing login through.");
+            return primaryStatus;
+        }
+
         TotpStore s = store;
         Challenge challenge = new Challenge(s.hmacKey());
         long now = System.currentTimeMillis();
 
-        if (credentials.find(username) == null) {
+        if (credentials.find(userId) == null) {
             // First login: self-enroll. Generate a secret and carry it (signed) in the
             // challenge; the client shows it as a QR/key, the user confirms a code,
             // and leg 2 persists it. Nothing is stored until that confirmation.
             String secret = Totp.generateSecret();
-            String token = challenge.issue(payload(username, "enroll", secret), now);
+            String token = challenge.issue(payload(userId, username, "enroll", secret), now);
             String message = "{\"mode\":\"enroll\",\"challenge\":" + jsonStr(token)
                     + ",\"secret\":" + jsonStr(secret)
                     + ",\"otpauthUri\":" + jsonStr(Totp.otpauthUri(s.issuer(), username, secret)) + "}";
@@ -152,7 +161,7 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
         }
 
         // Enrolled: challenge for the current code.
-        String token = challenge.issue(payload(username, "verify", null), now);
+        String token = challenge.issue(payload(userId, username, "verify", null), now);
         String message = "{\"mode\":\"verify\",\"challenge\":" + jsonStr(token) + "}";
         return new ExtendedLoginStatus(Status.FAIL, message, username, CLIENT_PLUGIN_CLASS);
     }
@@ -178,6 +187,13 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
         }
         String username = jsonField(payload, "u");
         String mode = jsonField(payload, "m");
+        String uidStr = jsonField(payload, "uid");
+        int userId;
+        try {
+            userId = Integer.parseInt(uidStr);
+        } catch (NumberFormatException e) {
+            return new LoginStatus(Status.FAIL, "Invalid authentication session.");
+        }
         if (username == null || mode == null) {
             return new LoginStatus(Status.FAIL, "Invalid authentication session.");
         }
@@ -188,14 +204,14 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
             if (step < 0) {
                 return new LoginStatus(Status.FAIL, "That code didn't match. Scan the key again and enter a fresh code.");
             }
-            credentials.enroll(username, secret, System.currentTimeMillis());
-            credentials.updateLastStep(username, step);   // the enrolling code can't be reused
-            logger.info("TOTP MFA: user '" + username + "' completed self-enrollment.");
+            credentials.enroll(userId, secret, System.currentTimeMillis());
+            credentials.updateLastStep(userId, step);   // the enrolling code can't be reused
+            logger.info("TOTP MFA: user '" + username + "' (id " + userId + ") completed self-enrollment.");
             return new LoginStatus(Status.SUCCESS, "", username);
         }
 
         // verify
-        TotpCredentialDao.Credential cred = credentials.find(username);
+        TotpCredentialDao.Credential cred = credentials.find(userId);
         if (cred == null) {
             return new LoginStatus(Status.FAIL, "Multi-factor authentication is not set up for this account.");
         }
@@ -207,7 +223,7 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
         if (step <= cred.lastUsedStep) {
             return new LoginStatus(Status.FAIL, "That code was already used. Wait for the next code and try again.");
         }
-        credentials.updateLastStep(username, step);
+        credentials.updateLastStep(userId, step);
         return new LoginStatus(Status.SUCCESS, "", username);
     }
 
@@ -222,13 +238,25 @@ public class TotpAuthenticationPlugin extends MultiFactorAuthenticationPlugin {
         }
     }
 
-    private static String payload(String username, String mode, String secret) {
+    private static String payload(int userId, String username, String mode, String secret) {
         StringBuilder sb = new StringBuilder("{\"u\":").append(jsonStr(username))
+                .append(",\"uid\":").append(jsonStr(String.valueOf(userId)))
                 .append(",\"m\":").append(jsonStr(mode));
         if (secret != null) {
             sb.append(",\"s\":").append(jsonStr(secret));
         }
         return sb.append("}").toString();
+    }
+
+    /** The user's numeric id, or null if it can't be resolved. */
+    private static Integer resolveUserId(String username) {
+        try {
+            User user = ControllerFactory.getFactory().createUserController().getUser(null, username);
+            return user != null ? user.getId() : null;
+        } catch (Exception e) {
+            logger.warn("TOTP MFA: user id lookup failed for '" + username + "': " + e.getMessage());
+            return null;
+        }
     }
 
     private static String jsonStr(String s) {

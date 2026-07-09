@@ -16,7 +16,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mirth.connect.client.core.ClientException;
+import com.mirth.connect.model.User;
 import com.mirth.connect.server.api.MirthServlet;
+import com.mirth.connect.server.controllers.ControllerFactory;
+import com.mirth.connect.server.controllers.UserController;
 
 public class TotpAdminServlet extends MirthServlet implements TotpAdminServletInterface {
 
@@ -30,10 +33,21 @@ public class TotpAdminServlet extends MirthServlet implements TotpAdminServletIn
     @Override
     public String listEnrolled() throws ClientException {
         try {
-            List<String> users = credentials.listEnrolled();
+            UserController userController = ControllerFactory.getFactory().createUserController();
+            List<Integer> ids = credentials.listEnrolledIds();
             ArrayNode arr = MAPPER.createArrayNode();
-            for (String u : users) {
-                arr.add(u);
+            for (Integer id : ids) {
+                User user = userController.getUser(id, null);
+                if (user != null) {
+                    ObjectNode row = MAPPER.createObjectNode();
+                    row.put("id", id);
+                    row.put("username", user.getUsername());
+                    arr.add(row);
+                } else {
+                    // The user was removed — prune the orphaned enrollment so it can't
+                    // be inherited if the id were ever reused, and never shows here.
+                    credentials.remove(id);
+                }
             }
             ObjectNode out = MAPPER.createObjectNode();
             out.set("users", arr);
@@ -44,14 +58,11 @@ public class TotpAdminServlet extends MirthServlet implements TotpAdminServletIn
     }
 
     @Override
-    public void reset(String username) throws ClientException {
-        if (username == null || username.isBlank()) {
-            throw new ClientException("A username is required.");
-        }
+    public void reset(int userId) throws ClientException {
         try {
-            credentials.remove(username);
+            credentials.remove(userId);
         } catch (Exception e) {
-            throw new ClientException("Failed to reset TOTP for '" + username + "': " + e.getMessage(), e);
+            throw new ClientException("Failed to reset TOTP for user " + userId + ": " + e.getMessage(), e);
         }
     }
 }

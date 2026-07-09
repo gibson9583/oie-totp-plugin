@@ -28,8 +28,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  *
  * Managing another user's second factor is a user-administration action, so both
  * operations require the engine's existing {@link Permissions#USERS_MANAGE}
- * permission. Resetting a user clears their enrollment; their next login then
- * starts the self-enroll flow again.
+ * permission. Enrollments are keyed by the user's numeric id; the list is
+ * cross-referenced with the current user set (orphaned rows from removed users are
+ * dropped and pruned). Resetting a user clears their enrollment, so their next
+ * login restarts the self-enroll flow.
  */
 @Path("/extensions/totpmfa")
 @Tag(name = "Extension Services")
@@ -41,13 +43,13 @@ public interface TotpAdminServletInterface extends BaseServletInterface {
 
     @GET
     @Path("/enrolled")
-    @Operation(summary = "Lists the usernames that currently have a TOTP enrollment.")
+    @Operation(summary = "Lists the currently-existing users that have a TOTP enrollment ({ users: [{ id, username }] }).")
     @MirthOperation(name = "listTotpEnrolled", display = "List TOTP-enrolled users", permission = Permissions.USERS_MANAGE, auditable = false)
     public String listEnrolled() throws ClientException;
 
     @POST
-    @Path("/reset/{username}")
-    @Operation(summary = "Removes a user's TOTP enrollment, so their next login re-enrolls them.")
+    @Path("/reset/{userId}")
+    @Operation(summary = "Removes a user's TOTP enrollment (by user id), so their next login re-enrolls them.")
     @MirthOperation(name = "resetTotpEnrollment", display = "Reset a user's TOTP enrollment", permission = Permissions.USERS_MANAGE)
-    public void reset(@Param("username") @PathParam("username") String username) throws ClientException;
+    public void reset(@Param("userId") @PathParam("userId") int userId) throws ClientException;
 }

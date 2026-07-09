@@ -6,8 +6,8 @@
  * user's stored secret so their next login restarts the self-enroll flow (the
  * lost-device / device-change path). Talks to the plugin's own servlet:
  *
- *   GET  /extensions/totpmfa/enrolled        -> { users: [username, ...] }
- *   POST /extensions/totpmfa/reset/{username} -> 204
+ *   GET  /extensions/totpmfa/enrolled     -> { users: [{ id, username }, ...] }
+ *   POST /extensions/totpmfa/reset/{userId} -> 204
  *
  * Both are gated by the engine's USERS_MANAGE permission. The login flow itself
  * needs no web code (the web admin's built-in OTP handler renders enroll/verify);
@@ -32,7 +32,12 @@ function TotpAdminPanel({ setTasks }) {
         setLoading(true);
         try {
             const res = await api.get(`${EXT}/enrolled`);
-            setUsers(api.asList(res && res.users).map(String).sort());
+            // The engine's response unwrapping reduces {users:[...]} to the bare
+            // array (single-key objects are unwrapped), so accept either shape.
+            const raw = Array.isArray(res) ? res : (res && res.users);
+            const list = api.asList(raw).filter((u) => u && u.id != null);
+            list.sort((a, b) => String(a.username).localeCompare(String(b.username)));
+            setUsers(list);
             setError(null);
         } catch (e) {
             setError(notInstalled(e)
@@ -47,18 +52,18 @@ function TotpAdminPanel({ setTasks }) {
     React.useEffect(() => {
         load();
         setTasks('Two-Factor Authentication Tasks', [
-            taskButton({ label: 'Refresh', icon: 'refresh', onClick: () => load() })
+            taskButton('Refresh', 'refresh', () => load())
         ]);
     }, [load, setTasks]);
 
-    const reset = async (username) => {
+    const reset = async (user) => {
         const ok = await confirmDialog('Reset Two-Factor Authentication',
-            `Remove the authenticator enrollment for "${username}"? They will be prompted to set up two-factor authentication again on their next login.`,
+            `Remove the authenticator enrollment for "${user.username}"? They will be prompted to set up two-factor authentication again on their next login.`,
             { danger: true, okLabel: 'Reset' });
         if (!ok) return;
         try {
-            await api.post(`${EXT}/reset/${encodeURIComponent(username)}`);
-            toast(`Reset two-factor authentication for "${username}".`, 'success');
+            await api.post(`${EXT}/reset/${encodeURIComponent(user.id)}`);
+            toast(`Reset two-factor authentication for "${user.username}".`, 'success');
             load();
         } catch (e) {
             toast(e.message || 'Reset failed.', 'error');
@@ -83,8 +88,8 @@ function TotpAdminPanel({ setTasks }) {
                     <thead><tr><th>User</th><th style={{ width: 120 }}></th></tr></thead>
                     <tbody>
                         {users.map((u) => (
-                            <tr key={u}>
-                                <td className="mono">{u}</td>
+                            <tr key={u.id}>
+                                <td className="mono">{u.username}</td>
                                 <td>
                                     <button className="btn btn-danger" onClick={() => reset(u)}>Reset</button>
                                 </td>
