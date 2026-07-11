@@ -1,7 +1,7 @@
 {
     "id": "totpmfa",
     "name": "TOTP MFA",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "author": "Chris Gibson",
     "description": "Two-Factor Authentication settings tab: list TOTP-enrolled users and reset a user's enrollment (lost-device recovery).",
     "oie": { "apiMin": "4.6" },

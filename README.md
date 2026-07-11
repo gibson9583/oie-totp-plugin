@@ -84,7 +84,7 @@ administrator must be able to render it:
 ## Build & install
 
 ```bash
-OIE_HOME=/path/to/oie mvn package        # -> target/totpmfa-0.3.0.zip
+OIE_HOME=/path/to/oie mvn package        # -> target/totpmfa-0.3.1.zip
 ```
 
 Install the zip from the web administrator's **Extensions** page (or the Swing

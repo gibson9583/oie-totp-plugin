@@ -2,7 +2,7 @@
 # a GitHub Release with the zip, then opens a community-catalog PR so the Community
 # Store offers it.
 #
-#   git tag v0.3.0 && git push origin v0.3.0
+#   git tag v0.3.1 && git push origin v0.3.1
 #
 # The tag drives the version stamped into the pom (zip name), plugin.xml
 # (pluginVersion — what the engine reports as "installed"); oie.json is verified to
@@ -167,6 +167,13 @@ jobs:
               "docsUrl": "https://raw.githubusercontent.com/${{ github.repository }}/v${VERSION}/docs/store.md"
           }
           EOF
+          # Surface the plugin's UI surfaces (from the tagged oie.json) when declared.
+          UI="$(jq -c '.ui // empty' /tmp/oie.json)"
+          if [ -n "$UI" ]; then
+            jq --indent 4 --argjson ui "$UI" '. + {ui: $ui}' \
+              "manifests/plugins/${PLUGIN_ID}/${VERSION}.json" > /tmp/version.json.tmp
+            mv /tmp/version.json.tmp "manifests/plugins/${PLUGIN_ID}/${VERSION}.json"
+          fi
 
       - name: Validate (schema + digest download)
         run: node scripts/build-index.mjs --lint --verify "manifests/plugins/${PLUGIN_ID}/${VERSION}.json"
