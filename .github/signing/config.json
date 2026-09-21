@@ -1,0 +1,6 @@
+{
+  "bundle": "target/totpmfa-*.zip",
+  "jars": [
+    "totpmfa/totpmfa-shared.jar"
+  ]
+}
