@@ -1,0 +1,47 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      OIE_TAG: v4.6.0-rc1
+      OIE_TARBALL: oie_unix_4_6_0-rc1.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Cache engine compile inputs
+        id: engine
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.OIE_TARBALL }}
+          key: oie-dist-${{ env.OIE_TAG }}
+      - name: Download engine compile inputs
+        if: steps.engine.outputs.cache-hit != 'true'
+        run: curl -fSL -o "$OIE_TARBALL" "https://github.com/OpenIntegrationEngine/engine/releases/download/${OIE_TAG}/${OIE_TARBALL}"
+      - name: Extract engine compile inputs
+        run: |
+          tar xzf "$OIE_TARBALL"
+          test -f "$GITHUB_WORKSPACE/oie/server-lib/mirth-server.jar"
+          echo "OIE_HOME=$GITHUB_WORKSPACE/oie" >> "$GITHUB_ENV"
+      - name: Test and inspect distributable
+        run: mvn -B -ntp verify
+      - name: Retain validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/

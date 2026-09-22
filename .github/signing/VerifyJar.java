@@ -14,9 +14,16 @@ class VerifyJar {
             return false;
         }
         String leaf = name.substring(9);
-        return leaf.equals("MANIFEST.MF") || leaf.startsWith("SIG-")
+        if (leaf.equals("MANIFEST.MF")
                 || leaf.endsWith(".SF") || leaf.endsWith(".RSA")
-                || leaf.endsWith(".DSA") || leaf.endsWith(".EC");
+                || leaf.endsWith(".DSA") || leaf.endsWith(".EC")) {
+            return true;
+        }
+        // Match the JDK's SignatureFileVerifier.isSigningRelated; longer or
+        // nonalphanumeric SIG-* extensions are ordinary signed resources.
+        int dot = leaf.lastIndexOf('.');
+        return leaf.startsWith("SIG-")
+                && (dot == -1 || leaf.substring(dot + 1).matches("[A-Z0-9]{1,3}"));
     }
 
     public static void main(String[] args) throws Exception {

@@ -4,14 +4,14 @@
 	<pluginVersion>0.3.1</pluginVersion>
 	<mirthVersion>4.6.0</mirthVersion>
 	<url>https://openintegrationengine.org</url>
-	<description>TOTP (RFC 6238) multi-factor authentication for administrator login. Challenges enrolled users with a time-based one-time code after their password; per-user secrets are stored encrypted in a dedicated USER_TOTP database table (MyBatis), with one-time-use (replay) protection.</description>
+	<description>TOTP (RFC 6238) multi-factor authentication for administrator login. Challenges enrolled users with a time-based one-time code after their password; per-user secrets are stored encrypted in the engine database (MyBatis), with single-use challenges, transactional replay protection, and persistent attempt limits.</description>
 	<serverClasses>
 		<string>org.openintegrationengine.plugins.totp.TotpAuthenticationPlugin</string>
 	</serverClasses>
 	<library type="SHARED" path="totpmfa-shared.jar" />
 	<apiProvider type="SERVLET_INTERFACE" name="org.openintegrationengine.plugins.totp.TotpAdminServletInterface"/>
 	<apiProvider type="SERVER_CLASS" name="org.openintegrationengine.plugins.totp.TotpAdminServlet"/>
-	<!-- Per-vendor MyBatis mapper for the USER_TOTP table (namespace "UserTotp").
+	<!-- Per-vendor MyBatis mapper for MFA state and migration metadata (namespace "UserTotp").
 	     The engine merges the mapper for the running database into its shared
 	     MyBatis config; the file path is relative to this plugin's directory. -->
 	<sqlMapConfigs>

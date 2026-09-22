@@ -7,7 +7,7 @@
 package org.openintegrationengine.plugins.totp;
 
 import java.security.SecureRandom;
-import java.time.Instant;
+import java.util.Locale;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -62,11 +62,15 @@ public final class Totp {
      * accepted step for that user.
      */
     public static long matchStep(String secretBase32, String code) {
+        return matchStep(secretBase32, code, System.currentTimeMillis());
+    }
+
+    static long matchStep(String secretBase32, String code, long nowMillis) {
         if (secretBase32 == null || code == null) {
             return -1;
         }
         String trimmed = code.trim();
-        if (trimmed.length() != DIGITS || !trimmed.chars().allMatch(Character::isDigit)) {
+        if (trimmed.length() != DIGITS || !trimmed.chars().allMatch(c -> c >= '0' && c <= '9')) {
             return -1;
         }
         byte[] key;
@@ -75,7 +79,7 @@ public final class Totp {
         } catch (RuntimeException e) {
             return -1;
         }
-        long step = Instant.now().getEpochSecond() / STEP_SECONDS;
+        long step = nowMillis / 1000L / STEP_SECONDS;
         for (int offset = -WINDOW; offset <= WINDOW; offset++) {
             if (constantTimeEquals(trimmed, generate(key, step + offset))) {
                 return step + offset;
@@ -84,7 +88,7 @@ public final class Totp {
         return -1;
     }
 
-    private static String generate(byte[] key, long step) {
+    static String generate(byte[] key, long step) {
         byte[] data = new byte[8];
         long value = step;
         for (int i = 7; i >= 0; i--) {
@@ -99,7 +103,7 @@ public final class Totp {
             int binary = ((hash[off] & 0x7f) << 24) | ((hash[off + 1] & 0xff) << 16)
                     | ((hash[off + 2] & 0xff) << 8) | (hash[off + 3] & 0xff);
             int otp = binary % (int) Math.pow(10, DIGITS);
-            return String.format("%0" + DIGITS + "d", otp);
+            return String.format(Locale.ROOT, "%0" + DIGITS + "d", otp);
         } catch (Exception e) {
             throw new IllegalStateException("HMAC-SHA1 unavailable", e);
         }
@@ -137,7 +141,7 @@ public final class Totp {
     }
 
     public static byte[] base32Decode(String s) {
-        String clean = s.trim().replace("=", "").replace(" ", "").toUpperCase();
+        String clean = s.trim().replace("=", "").replace(" ", "").toUpperCase(Locale.ROOT);
         int buffer = 0;
         int bits = 0;
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();

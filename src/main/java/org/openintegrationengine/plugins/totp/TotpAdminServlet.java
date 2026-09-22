@@ -6,16 +6,16 @@
 
 package org.openintegrationengine.plugins.totp;
 
-import java.util.List;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.Response;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mirth.connect.client.core.ClientException;
+import com.mirth.connect.client.core.api.MirthApiException;
 import com.mirth.connect.model.User;
 import com.mirth.connect.server.api.MirthServlet;
 import com.mirth.connect.server.controllers.ControllerFactory;
@@ -34,19 +34,16 @@ public class TotpAdminServlet extends MirthServlet implements TotpAdminServletIn
     public String listEnrolled() throws ClientException {
         try {
             UserController userController = ControllerFactory.getFactory().createUserController();
-            List<Integer> ids = credentials.listEnrolledIds();
             ArrayNode arr = MAPPER.createArrayNode();
-            for (Integer id : ids) {
+            for (TotpCredentialDao.Enrollment enrollment : credentials.listEnrollments()) {
+                int id = enrollment.userId;
                 User user = userController.getUser(id, null);
                 if (user != null) {
                     ObjectNode row = MAPPER.createObjectNode();
                     row.put("id", id);
                     row.put("username", user.getUsername());
+                    row.put("generation", enrollment.generation);
                     arr.add(row);
-                } else {
-                    // The user was removed — prune the orphaned enrollment so it can't
-                    // be inherited if the id were ever reused, and never shows here.
-                    credentials.remove(id);
                 }
             }
             ObjectNode out = MAPPER.createObjectNode();
@@ -58,9 +55,16 @@ public class TotpAdminServlet extends MirthServlet implements TotpAdminServletIn
     }
 
     @Override
-    public void reset(int userId) throws ClientException {
+    public void reset(int userId, String generation) throws ClientException {
+        if (userId <= 0 || generation == null || generation.isBlank() || generation.length() > 128) {
+            throw new MirthApiException(Response.Status.BAD_REQUEST);
+        }
         try {
-            credentials.remove(userId);
+            if (!credentials.remove(userId, generation)) {
+                throw new MirthApiException(Response.Status.CONFLICT);
+            }
+        } catch (MirthApiException e) {
+            throw e;
         } catch (Exception e) {
             throw new ClientException("Failed to reset TOTP for user " + userId + ": " + e.getMessage(), e);
         }

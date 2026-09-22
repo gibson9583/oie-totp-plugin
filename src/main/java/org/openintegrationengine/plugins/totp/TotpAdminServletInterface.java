@@ -11,6 +11,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
@@ -29,9 +30,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  * Managing another user's second factor is a user-administration action, so both
  * operations require the engine's existing {@link Permissions#USERS_MANAGE}
  * permission. Enrollments are keyed by the user's numeric id; the list is
- * cross-referenced with the current user set (orphaned rows from removed users are
- * dropped and pruned). Resetting a user clears their enrollment, so their next
- * login restarts the self-enroll flow.
+ * cross-referenced with the current user set. A reset requires the enrollment
+ * generation shown in that list, so a stale request cannot remove a new factor.
  */
 @Path("/extensions/totpmfa")
 @Tag(name = "Extension Services")
@@ -43,7 +43,7 @@ public interface TotpAdminServletInterface extends BaseServletInterface {
 
     @GET
     @Path("/enrolled")
-    @Operation(summary = "Lists the currently-existing users that have a TOTP enrollment ({ users: [{ id, username }] }).")
+    @Operation(summary = "Lists enrolled users ({ users: [{ id, username, generation }] }).")
     @MirthOperation(name = "listTotpEnrolled", display = "List TOTP-enrolled users", permission = Permissions.USERS_MANAGE, auditable = false)
     public String listEnrolled() throws ClientException;
 
@@ -51,5 +51,6 @@ public interface TotpAdminServletInterface extends BaseServletInterface {
     @Path("/reset/{userId}")
     @Operation(summary = "Removes a user's TOTP enrollment (by user id), so their next login re-enrolls them.")
     @MirthOperation(name = "resetTotpEnrollment", display = "Reset a user's TOTP enrollment", permission = Permissions.USERS_MANAGE)
-    public void reset(@Param("userId") @PathParam("userId") int userId) throws ClientException;
+    public void reset(@Param("userId") @PathParam("userId") int userId,
+            @Param("generation") @QueryParam("generation") String generation) throws ClientException;
 }
