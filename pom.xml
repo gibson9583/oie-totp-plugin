@@ -6,15 +6,14 @@
 
     <groupId>org.openintegrationengine.plugins</groupId>
     <artifactId>totpmfa</artifactId>
-    <version>0.3.1</version>
+    <version>0.3.2</version>
     <packaging>jar</packaging>
 
     <name>OIE TOTP MFA</name>
     <description>TOTP (RFC 6238) multi-factor authentication plugin for the Open Integration Engine administrator login.</description>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <oie.home>${env.OIE_HOME}</oie.home>
     </properties>
@@ -84,11 +83,42 @@
             <version>2.2.15</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Validation dependencies never enter the extension JAR or ZIP. -->
+        <!-- Loading the engine's User model in SQL tests requires its Commons Lang base types. -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.20.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.11.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.derby</groupId>
+            <artifactId>derby</artifactId>
+            <version>10.11.1.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <finalName>totpmfa-shared</finalName>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
             <!-- Build the web administrator half (webadmin/web/plugin.jsx -> plugin.js). -->
             <plugin>
                 <groupId>com.github.eirslett</groupId>
@@ -109,7 +139,7 @@
                         <id>npm-install</id>
                         <phase>generate-resources</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>install</arguments></configuration>
+                        <configuration><arguments>ci</arguments></configuration>
                     </execution>
                     <execution>
                         <id>npm-build-webadmin</id>
@@ -117,7 +147,39 @@
                         <goals><goal>npm</goal></goals>
                         <configuration><arguments>run build</arguments></configuration>
                     </execution>
+                    <execution>
+                        <id>npm-test-webadmin</id>
+                        <phase>test</phase>
+                        <goals><goal>npm</goal></goals>
+                        <configuration><arguments>test</arguments></configuration>
+                    </execution>
                 </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <derby.stream.error.file>${project.build.directory}/derby.log</derby.stream.error.file>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <executions>
+                    <execution>
+                        <goals><goal>integration-test</goal><goal>verify</goal></goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <systemPropertyVariables>
+                        <extension.zip>${project.build.directory}/totpmfa-${project.version}.zip</extension.zip>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
 
             <plugin>

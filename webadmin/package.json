@@ -4,7 +4,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "node build.mjs"
+        "build": "node build.mjs",
+        "test": "node --test test/*.test.mjs",
+        "test:browser": "node test/browser-regressions.mjs"
     },
     "devDependencies": {
         "esbuild": "^0.21.0"

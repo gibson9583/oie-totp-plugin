@@ -26,6 +26,11 @@ TOOL_SHA256 = "f14b1e1ef14bfa1fd00279c363aab0debbf5dcfba0e4bcdce5d22bb771de0e3a"
 SECRET_NAMES = (
     "SSL_COM_USERNAME", "SSL_COM_PASSWORD", "SSL_COM_CREDENTIAL_ID", "SSL_COM_TOTP_SECRET",
 )
+# Only these standard per-file signing attributes may change. Unknown digest
+# names, localized digests, Magic and all main attributes remain application data.
+SIGNING_DIGESTS = frozenset(
+    algorithm + "-digest" for algorithm in ("sha1", "sha-1", "sha-256", "sha-384", "sha-512", "md5")
+)
 
 
 def fingerprint(value):
@@ -60,8 +65,107 @@ def signature_metadata(name):
     if not name.startswith("META-INF/") or name.count("/") != 1:
         return False
     leaf = name.removeprefix("META-INF/")
-    return (leaf == "MANIFEST.MF" or leaf.startswith("SIG-")
-            or leaf.endswith((".SF", ".RSA", ".DSA", ".EC")))
+    if leaf == "MANIFEST.MF" or leaf.endswith((".SF", ".RSA", ".DSA", ".EC")):
+        return True
+    # Match the JDK's SignatureFileVerifier.isSigningRelated: a SIG-* file
+    # with a long/nonalphanumeric extension is ordinary, signed JAR payload.
+    return leaf.startswith("SIG-") and (
+        "." not in leaf or re.fullmatch(r"[A-Z0-9]{1,3}", leaf.rsplit(".", 1)[1]) is not None)
+
+
+def parse_manifest(data):
+    """Read unambiguous manifest semantics, unfolding bytes before UTF-8 decoding.
+
+    Attribute names are case-insensitive; values and entry names are preserved.
+    Release inputs reject duplicate sections rather than the spec's otherwise
+    valid merge/last-wins behavior. Entry names remain case-sensitive. Name must
+    lead each entry; other header order, wrapping and newlines are insignificant.
+    """
+    if b"\0" in data or not data.endswith((b"\r", b"\n")):
+        raise ValueError("Malformed JAR manifest: NUL or missing final newline")
+    sections, headers = [], []
+    for line in re.split(br"\r\n|\r|\n", data)[:-1]:
+        if len(line) > 72:
+            raise ValueError("Malformed JAR manifest: physical line exceeds 72 bytes")
+        if not line:
+            if headers:
+                attributes = {}
+                for key, value in headers:
+                    if key in attributes:
+                        raise ValueError("Ambiguous JAR manifest: duplicate attribute")
+                    try:
+                        attributes[key] = value.decode("utf-8")
+                    except UnicodeDecodeError:
+                        raise ValueError("Malformed JAR manifest: invalid UTF-8 value") from None
+                sections.append(attributes)
+                headers = []
+            elif not sections:
+                raise ValueError("Malformed JAR manifest: empty main section")
+        elif line.startswith(b" "):
+            if not headers:
+                raise ValueError("Malformed JAR manifest: orphan continuation")
+            headers[-1][1].extend(line[1:])
+        else:
+            match = re.fullmatch(br"([A-Za-z0-9][A-Za-z0-9_-]{0,69}): (.*)", line)
+            if match is None:
+                raise ValueError("Malformed JAR manifest: invalid attribute")
+            headers.append((match[1].decode("ascii").lower(), bytearray(match[2])))
+    if headers or not sections:
+        raise ValueError("Malformed JAR manifest: section missing blank-line terminator")
+    main, *individual = sections
+    if "name" in main or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", main.get("manifest-version", "")):
+        raise ValueError("Malformed JAR manifest: invalid main section")
+    entries, seen = {}, set()
+    for attributes in individual:
+        if next(iter(attributes)) != "name" or not attributes["name"]:
+            raise ValueError("Malformed JAR manifest: entry must start with Name")
+        name = attributes.pop("name")
+        if name in seen or name.upper() == "META-INF/MANIFEST.MF":
+            raise ValueError("Ambiguous JAR manifest: duplicate or self-referencing entry")
+        seen.add(name)
+        entries[name] = attributes
+    return main, entries
+
+
+def jar_manifest(data):
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        entries = checked_entries(archive)
+        manifests = [name for name in entries if name.rstrip("/").upper() == "META-INF/MANIFEST.MF"]
+        if not manifests:
+            return None
+        if manifests != ["META-INF/MANIFEST.MF"] or entries[manifests[0]].is_dir():
+            raise ValueError("Ambiguous JAR manifest: noncanonical or duplicate manifest path")
+        return parse_manifest(archive.read(manifests[0]))
+
+
+def check_manifest_parity(original, signed, payload):
+    """Permit signing metadata changes, never changes to runtime metadata."""
+    if original is None:
+        if signed is None:
+            return  # The subsequent signature/coverage check rejects unsigned output.
+        main, before = {}, {}
+        generated = signed[0]
+        if (generated.get("manifest-version") != "1.0"
+                or set(generated) - {"manifest-version", "created-by"}):
+            raise ValueError("Signing changed the JAR manifest: unexpected generated main attributes")
+        main = generated
+    else:
+        main, before = original
+    if signed is None or signed[0] != main:
+        raise ValueError("Signing changed the JAR manifest: main attributes")
+    after = signed[1]
+    for name in before.keys() | after.keys():
+        # Digest exceptions only apply to existing, non-signature payload files,
+        # never package sections, external URLs or main/application attributes.
+        def attributes(sections):
+            return {key: value for key, value in sections[name].items()
+                    if name not in payload or key not in SIGNING_DIGESTS}
+        if name not in before:
+            valid = name in payload and bool(after[name]) and not attributes(after)
+        else:
+            valid = name in after and attributes(before) == attributes(after)
+        if not valid:
+            raise ValueError("Signing changed the JAR manifest: entry attributes")
 
 
 def jar_payload(data):
@@ -207,12 +311,14 @@ def replace_jars(bundle, signed):
 
 
 def sign_bundle(bundle, patterns, expected_fingerprint):
+    """Sign an input ZIP held under exclusive writer access for this invocation."""
     bundle = bundle.resolve()
     with zipfile.ZipFile(bundle) as archive:
         selected = select_jars(archive, patterns)
         original = {name: archive.read(name) for name in selected}
     # Check the input JARs before contacting the paid signing service.
     payloads = {name: jar_payload(data) for name, data in original.items()}
+    manifests = {name: jar_manifest(data) for name, data in original.items()}
     if not all(payloads.values()):
         raise ValueError("Cannot sign an empty plugin JAR")
     with tempfile.TemporaryDirectory(prefix="sslcom-", dir=os.environ.get("RUNNER_TEMP")) as temp:
@@ -233,6 +339,7 @@ def sign_bundle(bundle, patterns, expected_fingerprint):
             data = path.read_bytes()
             if jar_payload(data) != payloads[name]:
                 raise ValueError(f"Signing changed the JAR payload: {name}")
+            check_manifest_parity(manifests[name], jar_manifest(data), payloads[name])
             verify_jar(path, expected_fingerprint)
             signed[name] = data
         replace_jars(bundle, signed)

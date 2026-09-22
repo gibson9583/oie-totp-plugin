@@ -1,46 +1,85 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC '-//mybatis.org//DTD Mapper 3.0//EN' 'http://mybatis.org/dtd/mybatis-3-mapper.dtd'>
-
-<!-- OIE TOTP MFA — sqlserver mapper for the USER_TOTP table (namespace UserTotp).
-     Keyed by the user's numeric id (the PERSON table PK), which is stable across
-     username renames and reused after a delete/re-add cycle only as a NEW id. -->
+<!-- Legacy USER_TOTP is retained as an immutable migration input. All current
+     operations use transactional state and an atomic, one-time migration marker. -->
 <mapper namespace="UserTotp">
-
-    <update id="createTable">
-        CREATE TABLE USER_TOTP (
-            USER_ID INT NOT NULL,
-            SECRET VARCHAR(512) NOT NULL,
-            ENROLLED_AT DATETIME,
-            LAST_USED_STEP BIGINT DEFAULT 0,
-            CONSTRAINT PK_USER_TOTP PRIMARY KEY (USER_ID)
+    <resultMap id="state" type="org.openintegrationengine.plugins.totp.TotpCredentialDao$State">
+        <id property="userId" column="USER_ID"/>
+        <result property="secret" column="SECRET" javaType="string"/>
+        <result property="enrolledAt" column="ENROLLED_AT"/>
+        <result property="lastUsedStep" column="LAST_USED_STEP"/>
+        <result property="generation" column="GENERATION"/>
+        <result property="tokenHash" column="TOKEN_HASH"/>
+        <result property="challengeData" column="CHALLENGE_DATA" javaType="string"/>
+        <result property="expiresAt" column="EXPIRES_AT"/>
+        <result property="attempts" column="ATTEMPTS"/>
+        <result property="attemptWindow" column="ATTEMPT_WINDOW"/>
+        <result property="revision" column="REVISION"/>
+    </resultMap>
+    <update id="createState">
+        CREATE TABLE USER_TOTP_STATE (
+            USER_ID INTEGER NOT NULL,
+            SECRET VARCHAR(512),
+            ENROLLED_AT DATETIME2,
+            LAST_USED_STEP BIGINT NOT NULL,
+            GENERATION VARCHAR(64) NOT NULL,
+            TOKEN_HASH VARCHAR(64),
+            CHALLENGE_DATA NVARCHAR(MAX),
+            EXPIRES_AT BIGINT NOT NULL,
+            ATTEMPTS INTEGER NOT NULL,
+            ATTEMPT_WINDOW BIGINT NOT NULL,
+            REVISION BIGINT NOT NULL,
+            CONSTRAINT PK_USER_TOTP_STATE PRIMARY KEY (USER_ID)
         )
     </update>
-
-    <select id="listEnrolledIds" resultType="java.lang.Integer">
-        SELECT USER_ID FROM USER_TOTP ORDER BY USER_ID
+    <update id="createMeta">
+        CREATE TABLE USER_TOTP_META (
+            ID INTEGER NOT NULL,
+            MIGRATED INTEGER NOT NULL,
+            REVISION BIGINT NOT NULL,
+            CONSTRAINT PK_USER_TOTP_META PRIMARY KEY (ID)
+        )
+    </update>
+    <select id="probeState" resultMap="state">
+        SELECT USER_ID, SECRET, ENROLLED_AT, LAST_USED_STEP, GENERATION, TOKEN_HASH,
+            CHALLENGE_DATA, EXPIRES_AT, ATTEMPTS, ATTEMPT_WINDOW, REVISION
+        FROM USER_TOTP_STATE WHERE 1 = 0
     </select>
-
-    <select id="find" parameterType="int" resultType="hashmap">
-        SELECT SECRET, LAST_USED_STEP FROM USER_TOTP WHERE USER_ID = #{userId}
+    <select id="probeMeta" resultType="map">
+        SELECT ID, MIGRATED, REVISION FROM USER_TOTP_META WHERE 1 = 0
     </select>
-
-    <insert id="insert" parameterType="map">
-        INSERT INTO USER_TOTP (USER_ID, SECRET, ENROLLED_AT, LAST_USED_STEP)
-        VALUES (#{userId}, #{secret}, #{enrolledAt}, #{lastUsedStep})
+    <insert id="insertMeta">INSERT INTO USER_TOTP_META (ID, MIGRATED, REVISION) VALUES (1, 0, 0)</insert>
+    <update id="lockMeta">UPDATE USER_TOTP_META SET REVISION = REVISION + 1 WHERE ID = 1</update>
+    <select id="migrationStatus" resultType="int">SELECT MIGRATED FROM USER_TOTP_META WHERE ID = 1</select>
+    <update id="migrationComplete">UPDATE USER_TOTP_META SET MIGRATED = 1 WHERE ID = 1</update>
+    <select id="find" parameterType="int" resultMap="state">
+        SELECT * FROM USER_TOTP_STATE WHERE USER_ID = #{userId}
+    </select>
+    <select id="findLocked" parameterType="int" resultMap="state">SELECT * FROM USER_TOTP_STATE WITH (UPDLOCK, ROWLOCK) WHERE USER_ID = #{userId}</select>
+    <select id="findToken" parameterType="string" resultMap="state">
+        SELECT * FROM USER_TOTP_STATE WHERE TOKEN_HASH = #{tokenHash}
+    </select>
+    <select id="listEnrolled" resultMap="state">
+        SELECT * FROM USER_TOTP_STATE WHERE SECRET IS NOT NULL ORDER BY USER_ID
+    </select>
+    <!-- Incrementing revision acquires a write lock with consistent affected-row
+         counts (including MySQL), held until the caller commits or rolls back. -->
+    <update id="lock" parameterType="int">
+        UPDATE USER_TOTP_STATE SET REVISION = REVISION + 1 WHERE USER_ID = #{userId}
+    </update>
+    <insert id="insert">
+        INSERT INTO USER_TOTP_STATE (USER_ID, SECRET, ENROLLED_AT, LAST_USED_STEP,
+            GENERATION, TOKEN_HASH, CHALLENGE_DATA, EXPIRES_AT, ATTEMPTS, ATTEMPT_WINDOW, REVISION)
+        VALUES (#{userId}, #{secret,jdbcType=VARCHAR}, #{enrolledAt,jdbcType=TIMESTAMP}, #{lastUsedStep},
+            #{generation}, #{tokenHash,jdbcType=VARCHAR}, #{challengeData,jdbcType=VARCHAR},
+            #{expiresAt}, #{attempts}, #{attemptWindow}, #{revision})
     </insert>
-
-    <update id="updateSecret" parameterType="map">
-        UPDATE USER_TOTP
-        SET SECRET = #{secret}, ENROLLED_AT = #{enrolledAt}, LAST_USED_STEP = #{lastUsedStep}
+    <update id="save">
+        UPDATE USER_TOTP_STATE SET SECRET = #{secret,jdbcType=VARCHAR},
+            ENROLLED_AT = #{enrolledAt,jdbcType=TIMESTAMP}, LAST_USED_STEP = #{lastUsedStep},
+            GENERATION = #{generation}, TOKEN_HASH = #{tokenHash,jdbcType=VARCHAR},
+            CHALLENGE_DATA = #{challengeData,jdbcType=VARCHAR}, EXPIRES_AT = #{expiresAt},
+            ATTEMPTS = #{attempts}, ATTEMPT_WINDOW = #{attemptWindow}
         WHERE USER_ID = #{userId}
     </update>
-
-    <update id="updateLastStep" parameterType="map">
-        UPDATE USER_TOTP SET LAST_USED_STEP = #{lastUsedStep} WHERE USER_ID = #{userId}
-    </update>
-
-    <delete id="delete" parameterType="int">
-        DELETE FROM USER_TOTP WHERE USER_ID = #{userId}
-    </delete>
-
 </mapper>

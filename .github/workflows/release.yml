@@ -103,7 +103,7 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' webadmin/plugin.json > webadmin/plugin.json.tmp && mv webadmin/plugin.json.tmp webadmin/plugin.json
 
       - name: Build extension
-        run: mvn -B -ntp -DskipTests package
+        run: mvn -B -ntp verify
 
       - name: Sign and verify release JARs with SSL.com
         env:
@@ -114,6 +114,10 @@ jobs:
           SSL_COM_TOTP_SECRET: ${{ secrets.SSL_COM_TOTP_SECRET }}
           SSL_COM_CERT_SHA256: ${{ vars.SSL_COM_CERT_SHA256 }}
         run: python3 .github/signing/sign_release.py
+
+      # Direct goals inspect the signed ZIP without rebuilding its unsigned JAR.
+      - name: Check signed extension contents
+        run: mvn -B -ntp failsafe:integration-test failsafe:verify
 
       - name: Stage the release asset and checksum
         id: pkg
