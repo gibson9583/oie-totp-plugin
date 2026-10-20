@@ -1,5 +1,7 @@
 # OIE TOTP MFA
 
+Release 0.3.3 is being prepared with engine compatibility limited to OIE **4.6.0 and 4.7.0**. Runtime validation on the final 4.7.0 release is pending; see the [release preparation notes](docs/oie-4.6-4.7-release.md).
+
 TOTP multi-factor authentication for Open Integration Engine administrator login.
 After a successful password login, new users enroll an authenticator; enrolled
 users enter a current six-digit code. The web administrator supplies the built-in

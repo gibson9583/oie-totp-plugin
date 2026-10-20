@@ -1,5 +1,7 @@
 # TOTP MFA
 
+Engine compatibility for the prepared 0.3.3 release: **OIE 4.6.0 and 4.7.0 only**. See the [release preparation notes](oie-4.6-4.7-release.md) for validation status.
+
 Time-based one-time-password multi-factor authentication for Open Integration
 Engine web administrator login.
 
